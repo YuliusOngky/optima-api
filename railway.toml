@@ -4,6 +4,6 @@ buildCommand = "npm install --include=dev --legacy-peer-deps && npm run build &&
 
 [deploy]
 startCommand = "npm run start:prod"
-healthcheckPath = "/api/health"
+healthcheckPath = "/api/products"
 healthcheckTimeout = 300
 restartPolicyType = "on-failure"
