@@ -1,0 +1,200 @@
+// Prisma Schema — Optima Store Phase 2
+// Run: npx prisma migrate dev --name init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── ENUMS ───────────────────────────────────────────────
+enum Role {
+  BUYER
+  SELLER
+  ADMIN
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  DONE
+  CANCELLED
+}
+
+enum BannerType {
+  HERO
+  SIDE
+}
+
+// ─── MODELS ──────────────────────────────────────────────
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  name      String
+  avatar    String?
+  role      Role     @default(BUYER)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  seller  Seller?
+  orders  Order[]
+  reviews Review[]
+  cart    CartItem[]
+
+  @@map("users")
+}
+
+model Seller {
+  id          Int      @id @default(autoincrement())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id])
+  name        String
+  slug        String   @unique
+  city        String
+  description String?
+  bannerUrl   String?
+  avatarUrl   String?
+  isVerified  Boolean  @default(false)
+  isActive    Boolean  @default(true)
+  rating      Float    @default(0)
+  totalSales  Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  products Product[]
+  orders   Order[]
+
+  @@map("sellers")
+}
+
+model Category {
+  id       Int       @id @default(autoincrement())
+  name     String    @unique
+  slug     String    @unique
+  icon     String
+  products Product[]
+
+  @@map("categories")
+}
+
+model Product {
+  id          Int      @id @default(autoincrement())
+  name        String
+  slug        String   @unique
+  description String?
+  price       Int
+  origPrice   Int?
+  stock       Int      @default(0)
+  weight      Int      @default(0) // grams
+  imageUrls   String[]
+  badge       String?  // disc | new | hot
+  isActive    Boolean  @default(true)
+  rating      Float    @default(0)
+  totalSold   Int      @default(0)
+
+  sellerId   Int
+  seller     Seller   @relation(fields: [sellerId], references: [id])
+  categoryId Int
+  category   Category @relation(fields: [categoryId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  orderItems  OrderItem[]
+  cartItems   CartItem[]
+  reviews     Review[]
+
+  @@map("products")
+}
+
+model CartItem {
+  id        Int      @id @default(autoincrement())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  productId Int
+  product   Product  @relation(fields: [productId], references: [id])
+  quantity  Int      @default(1)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, productId])
+  @@map("cart_items")
+}
+
+model Order {
+  id          String      @id @default(uuid())
+  orderNumber String      @unique
+  userId      String
+  user        User        @relation(fields: [userId], references: [id])
+  sellerId    Int
+  seller      Seller      @relation(fields: [sellerId], references: [id])
+  totalAmount Int
+  shippingFee Int         @default(0)
+  status      OrderStatus @default(PENDING)
+  paymentId   String?
+  snapToken   String?
+
+  // Shipping info
+  recipientName  String?
+  phone          String?
+  address        String?
+  city           String?
+  postalCode     String?
+  courier        String?
+  trackingNumber String?
+
+  items     OrderItem[]
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id        Int     @id @default(autoincrement())
+  orderId   String
+  order     Order   @relation(fields: [orderId], references: [id])
+  productId Int
+  product   Product @relation(fields: [productId], references: [id])
+  quantity  Int
+  price     Int // snapshot price at purchase time
+
+  @@map("order_items")
+}
+
+model Review {
+  id        Int      @id @default(autoincrement())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  productId Int
+  product   Product  @relation(fields: [productId], references: [id])
+  rating    Int // 1–5
+  comment   String?
+  sellerReply String?
+  createdAt DateTime @default(now())
+
+  @@map("reviews")
+}
+
+model Banner {
+  id        Int        @id @default(autoincrement())
+  type      BannerType @default(HERO)
+  title     String
+  subtitle  String?
+  ctaText   String?
+  emoji     String?
+  color     String?
+  imageUrl  String?
+  linkUrl   String?
+  isActive  Boolean    @default(true)
+  sortOrder Int        @default(0)
+  createdAt DateTime   @default(now())
+
+  @@map("banners")
+}
