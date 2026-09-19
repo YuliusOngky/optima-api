@@ -1,7 +1,44 @@
 // prisma/seed.ts
 import { PrismaClient } from '@prisma/client';
+import { createClient } from '@supabase/supabase-js';
 
 const prisma = new PrismaClient();
+
+const supabaseAdmin = createClient(
+  process.env.SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  { auth: { autoRefreshToken: false, persistSession: false } }
+);
+
+async function createAuthUser(email: string, password: string, name: string, role: 'BUYER' | 'SELLER' | 'ADMIN') {
+  // Coba buat di Supabase Auth
+  const { data, error } = await supabaseAdmin.auth.admin.createUser({
+    email,
+    password,
+    email_confirm: true,
+    user_metadata: { name, role },
+  });
+
+  if (error && !error.message.includes('already been registered')) {
+    console.warn(`  ⚠️  Auth user ${email}: ${error.message}`);
+  }
+
+  const authId = data?.user?.id;
+
+  // Upsert di public.User — pakai authId kalau berhasil, fallback ke UUID random
+  const user = await prisma.user.upsert({
+    where: { email },
+    update: { name, role },
+    create: {
+      id: authId ?? undefined,
+      email,
+      name,
+      role,
+    },
+  });
+
+  return user;
+}
 
 function toSlug(str: string): string {
   return str.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
@@ -9,6 +46,16 @@ function toSlug(str: string): string {
 
 async function main() {
   console.log('🌱 Seeding Optima Store database...');
+
+  // ─── Demo Users (Supabase Auth + public.User) ──────────────
+  console.log('👤 Creating demo users...');
+  await createAuthUser('demo@gmail.com', '123456', 'Demo Buyer', 'BUYER');
+  await createAuthUser('seller.demo@gmail.com', '123456', 'Demo Seller', 'SELLER');
+  await createAuthUser('admin@optimastore.id', 'Admin@123', 'Admin Optima', 'ADMIN');
+  console.log('✅ Demo users created');
+  console.log('   🛍️  Buyer : demo@gmail.com / 123456');
+  console.log('   🏪  Seller: seller.demo@gmail.com / 123456');
+  console.log('   🔑  Admin : admin@optimastore.id / Admin@123');
 
   // ─── Categories ───────────────────────────────────────────
   const categories = await Promise.all([
@@ -63,7 +110,23 @@ async function main() {
       },
     });
   }
-  console.log('✅ 12 sellers seeded');
+  // Buat Seller row untuk demo seller
+  const demoSellerUser = await prisma.user.findUnique({ where: { email: 'seller.demo@gmail.com' } });
+  if (demoSellerUser) {
+    await prisma.seller.upsert({
+      where: { userId: demoSellerUser.id },
+      update: {},
+      create: {
+        userId: demoSellerUser.id,
+        name: 'Demo Seller Store',
+        slug: 'demo-seller-store',
+        city: 'Jakarta Pusat',
+        rating: 5.0,
+        isActive: true,
+      },
+    });
+  }
+  console.log('✅ 12 sellers + 1 demo seller seeded');
 
   const sellers = await prisma.seller.findMany();
   const sellerMap = new Map(sellers.map(s => [s.name, s]));
@@ -193,7 +256,11 @@ async function main() {
   console.log('✅ 5 banners seeded');
 
   console.log('\n🎉 Seeding selesai! Database siap digunakan.');
-  console.log('   📊 8 categories | 12 sellers | 53 products | 5 banners');
+  console.log('   📊 8 categories | 13 sellers | 53 products | 5 banners');
+  console.log('\n🔑 Demo Credentials:');
+  console.log('   Buyer  → demo@gmail.com         / 123456');
+  console.log('   Seller → seller.demo@gmail.com  / 123456');
+  console.log('   Admin  → admin@optimastore.id   / Admin@123');
 }
 
 main()
