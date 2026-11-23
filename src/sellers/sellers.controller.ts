@@ -22,6 +22,21 @@ export class SellersController {
     return this.sellersService.findOne(id);
   }
 
+  @Public()
+  @Post('register')
+  register(
+    @Body() body: {
+      storeName: string;
+      city: string;
+      email: string;
+      ownerName?: string;
+      description?: string;
+      phone?: string;
+    },
+  ) {
+    return this.sellersService.register(body);
+  }
+
   @Post('onboard')
   // Requires login (not @Public), BUYER role
   @Roles('BUYER')

@@ -1,5 +1,5 @@
 // sellers/sellers.service.ts
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 function toSlug(str: string): string {
@@ -77,6 +77,67 @@ export class SellersService {
         city: data.city,
         description: data.description,
         isActive: false, // Pending verification
+      },
+    });
+
+    return { success: true, sellerId: seller.id, message: 'Toko berhasil didaftarkan, menunggu verifikasi.' };
+  }
+
+  async register(data: {
+    storeName: string;
+    city: string;
+    email: string;
+    ownerName?: string;
+    description?: string;
+    phone?: string;
+  }) {
+    const storeName = data.storeName?.trim();
+    const city = data.city?.trim();
+    const email = data.email?.trim().toLowerCase();
+    if (!storeName || !city || !email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      throw new BadRequestException('Nama toko, kota, dan email yang valid wajib diisi');
+    }
+
+    const description = [data.description?.trim(), data.phone?.trim() ? `HP: ${data.phone.trim()}` : '']
+      .filter(Boolean)
+      .join('\n');
+
+    const existingUser = await this.prisma.user.findUnique({
+      where: { email },
+      include: { seller: true },
+    });
+    if (existingUser?.seller) {
+      throw new ConflictException('Email ini sudah terdaftar sebagai penjual');
+    }
+
+    const user = existingUser
+      ? await this.prisma.user.update({
+          where: { id: existingUser.id },
+          data: {
+            role: 'SELLER',
+            name: data.ownerName?.trim() || existingUser.name,
+          },
+        })
+      : await this.prisma.user.create({
+          data: {
+            email,
+            name: data.ownerName?.trim() || storeName,
+            role: 'SELLER',
+          },
+        });
+
+    let slug = toSlug(storeName) || 'toko';
+    const existingSlug = await this.prisma.seller.findUnique({ where: { slug } });
+    if (existingSlug) slug = `${slug}-${Date.now()}`;
+
+    const seller = await this.prisma.seller.create({
+      data: {
+        userId: user.id,
+        name: storeName,
+        slug,
+        city,
+        description: description || null,
+        isActive: false,
       },
     });
 

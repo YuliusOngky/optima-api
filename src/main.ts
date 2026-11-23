@@ -7,10 +7,9 @@ async function bootstrap() {
 
   app.enableCors({
     origin: [
-    process.env.FRONTEND_URL || 'http://localhost:3000',
-    'https://gregarious-profiterole-508e70.netlify.app',
-    'https://ecommerce.optimadigitalselaras.com',
-  ],
+      process.env.FRONTEND_URL || 'http://localhost:3000',
+      'https://ecommerce.optimadigitalselaras.com',
+    ],
     credentials: true,
   });
 
@@ -29,4 +28,3 @@ async function bootstrap() {
   console.log(`🚀 Optima API running on: http://localhost:${port}/api`);
 }
 bootstrap();
-
