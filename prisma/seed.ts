@@ -1,6 +1,7 @@
 // prisma/seed.ts
 import { PrismaClient } from '@prisma/client';
 import { createClient } from '@supabase/supabase-js';
+import { imageForSlug } from './product-images';
 
 const prisma = new PrismaClient();
 
@@ -209,9 +210,19 @@ async function main() {
   for (const p of productsData) {
     const seller = getSeller(p.seller);
     const slug = toSlug(p.name);
+    const imageUrls = imageForSlug(slug);
     await prisma.product.upsert({
       where: { slug },
-      update: {},
+      update: {
+        description: p.description,
+        price: p.price,
+        origPrice: p.origPrice,
+        rating: p.rating,
+        totalSold: p.totalSold,
+        badge: p.badge,
+        imageUrls,
+        isActive: true,
+      },
       create: {
         name: p.name,
         slug,
@@ -222,6 +233,7 @@ async function main() {
         rating: p.rating,
         totalSold: p.totalSold,
         badge: p.badge,
+        imageUrls,
         isActive: true,
         categoryId: p.category.id,
         sellerId: seller.id,
